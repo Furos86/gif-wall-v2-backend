@@ -16,28 +16,27 @@ type ConnectionManager struct {
 	// Connected clients
 	clients map[*Client]bool
 
-	broadcast chan InteractionEvent
-
-	register chan *Client
+	broadcast chan *InteractionEvent
 
 	unregister chan *Client
 }
 
-func (cm *ConnectionManager) run() {
+func (cm *ConnectionManager) Run() {
+	// main connection manager loop
 	for {
 		select {
-		case client := <-cm.register:
-			cm.clients[client] = true
 		case client := <-cm.unregister:
-			if _, exists := cm.clients[client]; exists {
-				delete(cm.clients, client)
-				//do something to close channel
+			delete(cm.clients, client)
+
+		case event := <-cm.broadcast:
+			for client := range cm.clients {
+				client.Send(event)
 			}
 		}
 	}
 }
 
-func (cm *ConnectionManager) registerClient(context *gin.Context) {
+func (cm *ConnectionManager) RegisterClient(context *gin.Context) {
 	conn, err := upgrader.Upgrade(context.Writer, context.Request, nil)
 
 	if err != nil {
@@ -45,15 +44,17 @@ func (cm *ConnectionManager) registerClient(context *gin.Context) {
 		return
 	}
 
-	client := Client{cm: cm, conn: conn}
-	go client.receive()
+	client := &Client{connectionManager: cm, clientConnection: conn}
+
+	cm.clients[client] = true
+
+	go client.Receive()
 }
 
 func NewConnectionManager() *ConnectionManager {
 	return &ConnectionManager{
 		clients:    make(map[*Client]bool),
-		broadcast:  make(chan InteractionEvent),
-		register:   make(chan *Client),
+		broadcast:  make(chan *InteractionEvent),
 		unregister: make(chan *Client),
 	}
 }

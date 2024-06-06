@@ -1,14 +1,10 @@
 package server
 
 import (
-	envVar "gw-backend/internal/envVars"
-	"log"
-
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
+	"gw-backend/internal/envVars"
+	"gw-backend/internal/services/interactionLayer"
 )
-
-var upgrader = websocket.Upgrader{}
 
 func Run() {
 
@@ -24,15 +20,13 @@ func Run() {
 		panic(setTrustedProxiesError)
 	}
 
-	connectionManager = NewConnectionManager()
+	connectionManager := interactionLayer.NewConnectionManager()
+
+	go connectionManager.Run()
 
 	router.GET("/ws", func(context *gin.Context) {
 		print("we got connection")
-		conn, err := upgrader.Upgrade(context.Writer, context.Request, nil)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+		connectionManager.RegisterClient(context)
 
 	})
 
