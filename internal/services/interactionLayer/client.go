@@ -1,6 +1,7 @@
 package interactionLayer
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/gorilla/websocket"
@@ -24,20 +25,28 @@ func (client *Client) Receive() {
 
 		err := client.clientConnection.ReadJSON(&event)
 
+		// check if the error is a websocket close error
 		if err != nil {
-			// throw error when it it is not an expected disconnect
-			if websocket.IsUnexpectedCloseError(
-				err,
-				websocket.CloseNormalClosure,
-				websocket.CloseGoingAway,
-				websocket.CloseNoStatusReceived,
-			) {
-				log.Printf("client error: %v", err)
+			if _, ok := err.(*websocket.CloseError); ok {
+				if websocket.IsUnexpectedCloseError(
+					err,
+					websocket.CloseNormalClosure,
+					websocket.CloseGoingAway,
+					websocket.CloseNoStatusReceived,
+				) {
+					log.Printf("client error: %v", err)
+				}
+				break
 			}
-			break
-		}
 
-		client.connectionManager.broadcast <- event
+			if _, ok := err.(*json.SyntaxError); ok {
+				log.Printf("JSON syntax error: %v", err)
+			} else {
+				log.Printf("error: %v", err)
+			}
+		} else {
+			client.connectionManager.broadcast <- event
+		}
 	}
 }
 
